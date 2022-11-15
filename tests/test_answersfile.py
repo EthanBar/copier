@@ -34,16 +34,28 @@ def template_path(tmp_path_factory) -> str:
                 _secret_questions:
                     - password_1
 
+                # This task should execute
+                _tasks:
+                    - "touch task.txt"
+
+                # This file should not be created
+                _exclude:
+                    - skip.txt
                 password_1: password one
                 password_2:
                     secret: yes
                     default: password two
+
                 """,
             root
             / "round.txt.tmpl": """\
                 It's the [[round]] round.
                 password_1=[[password_1]]
                 password_2=[[password_2]]
+                """,
+            root
+            / "skip.txt": """\
+                This file shouldn't exist
                 """,
         }
     )
@@ -128,3 +140,35 @@ def test_answersfile(template_path, tmp_path, answers_file):
     assert log["str_question_without_default"] is None
     assert "password_1" not in log
     assert "password_2" not in log
+
+
+@pytest.mark.parametrize("answers_file", [None, ".changed-by-user.yaml"])
+def test_skip_file(template_path, tmp_path, answers_file):
+    """Test copier skips files when skip_file is specified"""
+    round_file = tmp_path / "round.txt"
+    skip_file = tmp_path / "skip.txt"
+
+    copier.copy(
+        template_path,
+        tmp_path,
+        answers_file=answers_file,
+        defaults=True,
+        overwrite=True,
+    )
+    assert round_file.exists()
+    assert not skip_file.exists()
+
+
+@pytest.mark.parametrize("answers_file", [None, ".changed-by-user.yaml"])
+def test_tasks(template_path, tmp_path, answers_file):
+    """Test copier runs supplied tasks in shell in the new directory"""
+    task_file = tmp_path / "task.txt"
+
+    copier.copy(
+        template_path,
+        tmp_path,
+        answers_file=answers_file,
+        defaults=True,
+        overwrite=True,
+    )
+    assert task_file.exists()
